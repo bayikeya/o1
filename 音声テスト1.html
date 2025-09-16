@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>避難誘導テスト</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            margin: 2em;
+        }
+
+        button {
+            font-size: 1.2em;
+            padding: 0.7em 1.5em;
+            margin-top: 1em;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>避難誘導テスト</h1>
+    <p>アプリを開始するには下のボタンを押してください</p>
+
+    <!-- 最初に表示するボタン -->
+    <button id="startBtn">開始(自動音声開始)</button>
+    <!-- 再生後に出るボタン -->
+    <button id="nextBtn" style="display:none;">次のスポットへ</button>
+
+    <script>
+        // ====== 設定 ======
+        const spot = { lat: 35.69275213325474, lng: 140.05076387530227 }; // 14号館横入り口（例）
+        const radius = 10; // [m] 10m以内で反応
+        const audioFile = "Cheery_Melodies.mp3"; // 再生する音声ファイル
+
+        let audio = null;
+        let watchId = null;
+        let audioAllowed = false;
+        let playedOnce = false; // 同じスポットで何度も鳴らないように
+
+        // 距離計算（Haversine）
+        function getDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000;
+            const toRad = x => x * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLng = toRad(lng2 - lng1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // 位置監視開始
+        function startWatching() {
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(pos => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const d = getDistance(lat, lng, spot.lat, spot.lng);
+                    console.log("現在位置との距離:", d);
+
+                    if (d <= radius && audioAllowed && !playedOnce) {
+                        playedOnce = true;
+                        audio.play().then(() => {
+                            console.log("自動再生開始");
+                        }).catch(err => console.log("再生失敗:", err));
+                    }
+                }, err => console.error(err), { enableHighAccuracy: true });
+            } else {
+                alert("位置情報が使えません");
+            }
+        }
+
+        // ボタン動作
+        document.getElementById("startBtn").addEventListener("click", () => {
+            audio = new Audio(audioFile);
+            audio.load();
+            audioAllowed = true;
+            startWatching();
+            document.getElementById("startBtn").style.display = "none";
+            alert("準備完了！スポットに近づくと音声が流れます。");
+        });
+
+        // 再生終了時に「次へ」ボタンを表示
+        document.addEventListener("ended", e => {
+            if (e.target === audio) {
+                document.getElementById("nextBtn").style.display = "inline-block";
+            }
+        }, true);
+    </script>
+</body>
+
+</html>
